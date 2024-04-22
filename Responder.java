@@ -26,6 +26,9 @@ public class Responder
     // The name of the file containing the default responses.
     private static final String FILE_OF_DEFAULT_RESPONSES = "default.txt";
     private Random randomGenerator;
+    
+    private static final String FILE_OF_RESPONSES = "default.txt";
+
 
     /**
      * Construct a Responder
@@ -65,83 +68,92 @@ public class Responder
      * Enter all the known keywords and their associated responses
      * into our response map.
      */
-    private void fillResponseMap()
-    {
-        responseMap.put("crash", 
-                        "Well, it never crashes on our system. It must have something\n" +
-                        "to do with your system. Tell me more about your configuration.");
-        responseMap.put("crashes", 
-                        "Well, it never crashes on our system. It must have something\n" +
-                        "to do with your system. Tell me more about your configuration.");
-        responseMap.put("slow", 
-                        "I think this has to do with your hardware. Upgrading your processor\n" +
-                        "should solve all performance problems. Have you got a problem with\n" +
-                        "our software?");
-        responseMap.put("performance", 
-                        "Performance was quite adequate in all our tests. Are you running\n" +
-                        "any other processes in the background?");
-        responseMap.put("bug", 
-                        "Well, you know, all software has some bugs. But our software engineers\n" +
-                        "are working very hard to fix them. Can you describe the problem a bit\n" +
-                        "further?");
-        responseMap.put("buggy", 
-                        "Well, you know, all software has some bugs. But our software engineers\n" +
-                        "are working very hard to fix them. Can you describe the problem a bit\n" +
-                        "further?");
-        responseMap.put("windows", 
-                        "This is a known bug to do with the Windows operating system. Please\n" +
-                        "report it to Microsoft. There is nothing we can do about this.");
-        responseMap.put("macintosh", 
-                        "This is a known bug to do with the Mac operating system. Please\n" +
-                        "report it to Apple. There is nothing we can do about this.");
-        responseMap.put("expensive", 
-                        "The cost of our product is quite competitive. Have you looked around\n" +
-                        "and really compared our features?");
-        responseMap.put("installation", 
-                        "The installation is really quite straight forward. We have tons of\n" +
-                        "wizards that do all the work for you. Have you read the installation\n" +
-                        "instructions?");
-        responseMap.put("memory", 
-                        "If you read the system requirements carefully, you will see that the\n" +
-                        "specified memory requirements are 1.5 giga byte. You really should\n" +
-                        "upgrade your memory. Anything else you want to know?");
-        responseMap.put("linux", 
-                        "We take Linux support very seriously. But there are some problems.\n" +
-                        "Most have to do with incompatible glibc versions. Can you be a bit\n" +
-                        "more precise?");
-        responseMap.put("bluej", 
-                        "Ahhh, BlueJ, yes. We tried to buy out those guys long ago, but\n" +
-                        "they simply won't sell... Stubborn people they are. Nothing we can\n" +
-                        "do about it, I'm afraid.");
+    private void fillResponseMap() {
+    Charset charset = Charset.forName("US-ASCII");
+    Path path = Paths.get(FILE_OF_RESPONSES);
+    try (BufferedReader reader = Files.newBufferedReader(path, charset)) {
+        String line;
+        String key = null;
+        StringBuilder responseBuilder = new StringBuilder();
+        while ((line = reader.readLine()) != null) {
+            if (!line.trim().isEmpty()) {
+                // If key is null, we are reading a new key-value pair
+                if (key == null) {
+                    String[] keyValue = line.split(",", 2);
+                    if (keyValue.length == 2) {
+                        key = keyValue[0].trim();
+                        // Append the response to the current key
+                        responseBuilder.append(keyValue[1].trim()).append("\n");
+                    } else {
+                        System.err.println("Invalid format for key-value pair: " + line);
+                    }
+                } else {
+                    // Append non-blank lines to the current response
+                    responseBuilder.append(line).append("\n");
+                }
+            } else {
+                // Blank line indicates the end of the current key-value pair
+                String response = responseBuilder.toString().trim();
+                if (key != null && !response.isEmpty()) {
+                    responseMap.put(key, response);
+                    // Reset key and responseBuilder for the next key-value pair
+                    key = null;
+                    responseBuilder = new StringBuilder();
+                }
+            }
+        }
+        // Add the last response if key is not null and response is not empty
+        if (key != null && !responseBuilder.toString().trim().isEmpty()) {
+            responseMap.put(key, responseBuilder.toString().trim());
+        }
+    } catch (FileNotFoundException e) {
+        System.err.println("Unable to open " + FILE_OF_RESPONSES);
+    } catch (IOException e) {
+        System.err.println("A problem was encountered reading " + FILE_OF_RESPONSES);
     }
+}
 
     /**
      * Build up a list of default responses from which we can pick
      * if we don't know what else to say.
      */
-    private void fillDefaultResponses()
-    {
-        Charset charset = Charset.forName("US-ASCII");
-        Path path = Paths.get(FILE_OF_DEFAULT_RESPONSES);
-        try (BufferedReader reader = Files.newBufferedReader(path, charset)) {
-            String response = reader.readLine();
-            while(response != null) {
-                defaultResponses.add(response);
-                response = reader.readLine();
+    private void fillDefaultResponses() {
+    Charset charset = Charset.forName("US-ASCII");
+    Path path = Paths.get(FILE_OF_DEFAULT_RESPONSES);
+    try (BufferedReader reader = Files.newBufferedReader(path, charset)) {
+        String line;
+        StringBuilder responseBuilder = new StringBuilder();
+        while ((line = reader.readLine()) != null) {
+            if (!line.trim().isEmpty()) {
+                // Append non-blank lines to the current entry
+                responseBuilder.append(line).append("\n");
+            } else {
+                // Blank line indicates the end of the current entry
+                String response = responseBuilder.toString().trim();
+                if (!response.isEmpty()) {
+                    // Add the non-empty response to the list
+                    defaultResponses.add(response);
+                    // Reset the responseBuilder for the next entry
+                    responseBuilder = new StringBuilder();
+                }
             }
         }
-        catch(FileNotFoundException e) {
-            System.err.println("Unable to open " + FILE_OF_DEFAULT_RESPONSES);
+        // Add the last response if it's not empty
+        String lastResponse = responseBuilder.toString().trim();
+        if (!lastResponse.isEmpty()) {
+            defaultResponses.add(lastResponse);
         }
-        catch(IOException e) {
-            System.err.println("A problem was encountered reading " +
-                               FILE_OF_DEFAULT_RESPONSES);
-        }
-        // Make sure we have at least one response.
-        if(defaultResponses.size() == 0) {
-            defaultResponses.add("Could you elaborate on that?");
-        }
+    } catch (FileNotFoundException e) {
+        System.err.println("Unable to open " + FILE_OF_DEFAULT_RESPONSES);
+    } catch (IOException e) {
+        System.err.println("A problem was encountered reading " + FILE_OF_DEFAULT_RESPONSES);
     }
+    // Make sure we have at least one response.
+    if (defaultResponses.isEmpty()) {
+        defaultResponses.add("Could you elaborate on that?");
+    }
+}
+
 
     /**
      * Randomly select and return one of the default responses.
